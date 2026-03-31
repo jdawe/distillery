@@ -1,0 +1,23 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+.env
+
+# Data — keep out of git (local only, backed up to iCloud on milestones)
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# Secrets
+*.json
+!pyproject.toml
+
+# macOS
+.DS_Store

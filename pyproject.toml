@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "janjon-distillery"
+version = "1.0.0"
+description = "Raw content in, concentrated signal out — JanJon Distillery pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Jan Solo", email = "jd@janjon.ai" }
+]
+keywords = ["distillation", "summarization", "podcast", "newsletter", "tts", "pipeline"]
+
+dependencies = [
+  "click>=8.0",
+  "trafilatura>=2.0",
+  "anthropic>=0.84",
+  "google-api-python-client>=2.0",
+  "google-auth-httplib2>=0.2",
+  "google-auth-oauthlib>=1.0",
+  "requests>=2.28",
+]
+
+[project.scripts]
+distill = "distillery.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["distillery*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

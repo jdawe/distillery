@@ -1,0 +1,140 @@
+"""
+Deliver stage: Send distillation to Telegram.
+
+For each rendered item:
+1. Send text message: grade emoji + title + author + summary + key insights
+2. Send voice note: the rendered audio (asVoice: true)
+"""
+import json
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from .db import db, get_pending, update_item, set_error
+
+import os as _os
+TELEGRAM_TARGET = _os.environ.get("DISTILLERY_TELEGRAM_CHAT", "")
+
+GRADE_EMOJI = {
+    "skim": "⚡",
+    "signal": "📡",
+    "fire": "🔥",
+}
+
+
+def run_deliver(limit: Optional[int] = None, source_type: Optional[str] = None) -> dict:
+    """Process all 'rendered' items through delivery. Returns {ok, failed}."""
+    ok = 0
+    failed = 0
+
+    with db() as conn:
+        items = get_pending(conn, "rendered", limit=limit, source_type=source_type)
+        item_list = [dict(row) for row in items]
+
+    for item in item_list:
+        item_id = item["id"]
+        try:
+            msg_id = _deliver_item(item)
+            now = datetime.now(timezone.utc).isoformat()
+            with db() as conn:
+                update_item(
+                    conn,
+                    item_id,
+                    state="delivered",
+                    delivered_at=now,
+                    telegram_message_id=str(msg_id) if msg_id else None,
+                    error=None,
+                    error_at=None,
+                )
+            ok += 1
+            print(f"  ✓ delivered: {item.get('title', item_id)[:50]}")
+        except Exception as e:
+            with db() as conn:
+                set_error(conn, item_id, str(e))
+                update_item(conn, item_id, state="failed:deliver")
+            failed += 1
+            print(f"  ✗ deliver [{item_id}]: {e}")
+
+    return {"ok": ok, "failed": failed}
+
+
+def _format_text_message(item: dict) -> str:
+    grade = item.get("grade", "signal")
+    emoji = GRADE_EMOJI.get(grade, "📡")
+    title = item.get("title", "Untitled")
+    author = item.get("author", "")
+    summary = item.get("distill_summary", "")
+    insights_raw = item.get("insights_json", "[]")
+    source_url = item.get("source_url", "")
+
+    try:
+        insights = json.loads(insights_raw) if insights_raw else []
+    except Exception:
+        insights = []
+
+    parts = [f"{emoji} *{title}*"]
+    if author:
+        parts.append(f"_{author}_")
+    parts.append("")
+
+    if summary:
+        parts.append(summary)
+
+    if insights:
+        parts.append("")
+        for i, ins in enumerate(insights, 1):
+            insight_text = ins.get("insight", "")
+            why_matters = ins.get("why_matters", "")
+            if insight_text:
+                parts.append(f"• {insight_text}")
+            if why_matters:
+                parts.append(f"  ↳ {why_matters}")
+
+    if source_url and not source_url.startswith("gmail://"):
+        parts.append("")
+        parts.append(source_url)
+
+    return "\n".join(parts)
+
+
+def _deliver_item(item: dict) -> Optional[str]:
+    """Send text + voice to Telegram. Returns message ID if available."""
+    text_msg = _format_text_message(item)
+    audio_path = item.get("render_audio_path")
+
+    # Send text
+    _send_telegram_text(text_msg)
+
+    # Send voice note
+    if audio_path and Path(audio_path).exists():
+        _send_telegram_voice(audio_path)
+    else:
+        print(f"  ⚠ no audio file for {item['id']}, skipping voice")
+
+    return None  # openclaw CLI doesn't return message IDs easily
+
+
+def _send_telegram_text(text: str):
+    cmd = [
+        "openclaw", "message", "send",
+        "--channel", "telegram",
+        "--to", TELEGRAM_TARGET,
+        "--message", text,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        raise RuntimeError(f"Telegram text send failed: {result.stderr.strip()[:300]}")
+
+
+def _send_telegram_voice(audio_path: str):
+    cmd = [
+        "openclaw", "message", "send",
+        "--channel", "telegram",
+        "--to", TELEGRAM_TARGET,
+        "--file", audio_path,
+        "--as-voice",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0:
+        raise RuntimeError(f"Telegram voice send failed: {result.stderr.strip()[:300]}")
