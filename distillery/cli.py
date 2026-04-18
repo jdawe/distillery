@@ -6,7 +6,7 @@ Usage:
   distill ingest youtube
   distill ingest newsletter
   distill ingest <url>
-  distill run [--limit N] [--stage extract|distill|render|deliver|upload]
+  distill run [--limit N] [--stage extract|distill|render|deliver]
   distill status [--json]
   distill list [--grade fire|signal|skim] [--state STATE] [--limit N]
   distill history [--days 7]
@@ -36,7 +36,6 @@ STATE_ORDER = [
     "distilled",
     "rendered",
     "delivered",
-    "uploaded",
 ]
 
 
@@ -120,7 +119,7 @@ def ingest_dispatch(ctx, target, dry_run):
 # distill run
 # ──────────────────────────────────────────────
 
-STAGES = ("extract", "distill", "render", "deliver", "upload")
+STAGES = ("extract", "distill", "render", "deliver")
 
 
 @cli.command("run")
@@ -133,14 +132,13 @@ def run_pipeline(limit, stage, source):
     """
     Process pending items through the pipeline.
 
-    By default runs all stages in order: extract → distill → render → deliver → upload.
+    By default runs all stages in order: extract → distill → render → deliver.
     Use --stage to run a single stage only.
     """
     from .extract import run_extract
     from .distill import run_distill
     from .render import run_render
     from .deliver import run_deliver
-    from .upload import run_upload
 
     stages_to_run = [stage] if stage else list(STAGES)
 
@@ -156,8 +154,6 @@ def run_pipeline(limit, stage, source):
             r = run_render(limit=limit, source_type=source)
         elif s == "deliver":
             r = run_deliver(limit=limit, source_type=source)
-        elif s == "upload":
-            r = run_upload(limit=limit)
         else:
             continue
         click.echo(f"  ✓ {r.get('ok',0)} ok  ✗ {r.get('failed',0)} failed")
@@ -289,7 +285,7 @@ def history(days, grade, as_json):
     """Show recent distillations."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     with db() as conn:
-        sql = ("SELECT * FROM items WHERE state IN ('delivered','uploaded') "
+        sql = ("SELECT * FROM items WHERE state = 'delivered' "
                "AND created_at >= ?")
         params = [cutoff]
         if grade:
@@ -387,7 +383,7 @@ def cleanup(days, dry_run):
     with db() as conn:
         rows = conn.execute(
             "SELECT id, render_path, render_audio_path, grade FROM items "
-            "WHERE created_at < ? AND state IN ('delivered','uploaded') "
+            "WHERE created_at < ? AND state = 'delivered' "
             "AND grade != 'fire'",
             [cutoff]
         ).fetchall()

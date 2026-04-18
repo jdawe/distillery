@@ -2,7 +2,7 @@
 
 > Raw content in. Concentrated signal out.
 
-A personal content distillation pipeline. Ingests YouTube Watch Later, newsletters, and ad-hoc URLs — grades them with Claude, renders audio with Aria TTS, and delivers to Telegram as text + voice notes. 🔥 items get uploaded to a private YouTube "Distilled" playlist.
+A personal content distillation pipeline. Ingests YouTube Watch Later, newsletters, and ad-hoc URLs — grades them with Claude, renders audio with Aria TTS, and delivers to Telegram as text + voice notes.
 
 ---
 
@@ -15,7 +15,7 @@ SOURCE ADAPTERS                    PIPELINE STAGES
 │ (Watch Later)     │  │    ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐
 │ newsletter        │──┼──→ │ EXTRACT  │─→ │ DISTILL  │─→ │ RENDER   │─→ │ DELIVER  │
 │ (Gmail)           │  │    │ text out │   │ Claude   │   │ Aria TTS │   │ Telegram │
-│ url               │──┘    │          │   │ + grade  │   │ + title  │   │ + YT 🔥  │
+│ url               │──┘    │          │   │ + grade  │   │ + title  │   │          │
 │ (ad-hoc)          │       └──────────┘   │          │   │ card mp4 │   └──────────┘
 └──────────────────┘                       └──────────┘   └──────────┘
 ```
@@ -26,10 +26,10 @@ SOURCE ADAPTERS                    PIPELINE STAGES
 |-------|-------|---------|
 | `skim` | ⚡ | Nothing new. Delivered but low-signal. |
 | `signal` | 📡 | 1-2 non-obvious insights. Worth your time. |
-| `fire` | 🔥 | Exceptional. Also uploaded to YouTube Distilled. |
+| `fire` | 🔥 | Exceptional. Local render kept indefinitely (others get GC'd). |
 
-All grades get: Telegram text message + Aria TTS voice note + local mp4 render.  
-Only 🔥 gets: uploaded to YouTube "Distilled" playlist (private).
+All grades get: Telegram text message + Aria TTS voice note + local mp4 render.
+🔥 renders are preserved by `distill cleanup`; everything else ages out after 14 days.
 
 ## Data Layout
 
@@ -102,7 +102,6 @@ distill run --stage extract
 distill run --stage distill
 distill run --stage render
 distill run --stage deliver
-distill run --stage upload
 
 # Process only YouTube items
 distill run --source youtube
@@ -174,11 +173,8 @@ All settings are configurable via environment variables or a `.env` file in the 
 | DB path | `DISTILLERY_DB` | `~/.openclaw/workspace/data/distillery/distillery.db` |
 | TTS Voice | `DISTILLERY_TTS_VOICE` | `en-US-AriaNeural` |
 | ffmpeg path | `DISTILLERY_FFMPEG` | `ffmpeg` (or `ffmpeg-full` if installed) |
-| YouTube OAuth token | `DISTILLERY_YT_TOKEN` | *(required for 🔥 uploads)* |
-| YouTube client secret | `DISTILLERY_YT_CLIENT_SECRET` | *(required for 🔥 uploads)* |
 | Distillation prompt | `DISTILLERY_PROMPT` | `./prompts/summarize.md` |
-| Telegram chat ID | `DISTILLERY_TELEGRAM_CHAT` | *(required)* |
-| YouTube playlist ID | `DISTILLERY_YT_PLAYLIST` | *(required for 🔥 uploads)* |
+| Telegram chat ID | `DISTILLERY_TELEGRAM_CHAT` | `8040682185` (hardcoded default) |
 
 Copy `.env.example` to `.env` and fill in your values:
 
@@ -196,7 +192,6 @@ ingested
   → distilled     (Claude graded + insights extracted)
   → rendered      (Aria TTS audio + title card mp4)
   → delivered     (sent to Telegram)
-  → uploaded      (🔥 only: on YouTube Distilled)
 
 Any stage can → failed:{stage} with error stored in DB.
 ```

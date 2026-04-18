@@ -46,7 +46,7 @@ CREATE TABLE items (
   
   -- State machine
   state TEXT NOT NULL DEFAULT 'ingested',  
-    -- ingested → extracted → distilled → rendered → delivered → uploaded (🔥 only)
+    -- ingested → extracted → distilled → rendered → delivered
   
   -- Extract stage
   transcript_path TEXT,            -- path to extracted text file
@@ -67,10 +67,6 @@ CREATE TABLE items (
   delivered_at DATETIME,
   telegram_message_id TEXT,
   
-  -- Upload stage (YT — 🔥 only)
-  youtube_id TEXT,
-  uploaded_at DATETIME,
-  
   -- Metadata
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   error TEXT,
@@ -90,10 +86,10 @@ CREATE INDEX idx_created ON items(created_at);
 Claude distillation returns a structured grade alongside insights:
 - **skim** — No material new learnings. Gets rendered + delivered but marked as low-signal.
 - **signal** — 1-2 genuinely new/non-obvious insights. Default grade for most content.
-- **fire** (🔥) — Worth consuming in full. Gets uploaded to YT Distilled playlist.
+- **fire** (🔥) — Worth consuming in full. Local render preserved across GC.
 
 ALL grades get: text summary to Telegram + Aria TTS voice note to Telegram + local mp4 render.
-ONLY 🔥 gets: uploaded to YouTube "Distilled" playlist.
+🔥 renders are preserved indefinitely; other renders age out via `distill cleanup --days N`.
 
 ## Distillation Prompt
 
@@ -135,13 +131,6 @@ Telegram (target: `$DISTILLERY_TELEGRAM_CHAT`):
 - Text message: grade emoji + title + author + pithy summary
 - Voice note: the rendered audio sent as voice message (asVoice: true)
 
-## YouTube Upload
-
-- Only 🔥 items
-- Playlist: "Distilled" (ID: `$DISTILLERY_YT_PLAYLIST`)
-- Credentials: `$DISTILLERY_YT_TOKEN` (OAuth token) + `$DISTILLERY_YT_CLIENT_SECRET`
-- Privacy: private (unlisted)
-
 ## File Layout
 
 ```
@@ -177,6 +166,5 @@ Weekly cleanup sweeps renders older than 14 days (keeps DB records, deletes file
 - edge-tts (Aria voice)
 - ffmpeg-full (drawtext/freetype)
 - summarize CLI (transcript extraction)
-- google-api-python-client (YouTube upload)
 - trafilatura (URL text extraction)
 - gog CLI (Gmail newsletter extraction)

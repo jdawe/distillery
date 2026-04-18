@@ -14,7 +14,7 @@ from typing import Optional
 from .db import db, get_pending, update_item, set_error
 
 import os as _os
-TELEGRAM_TARGET = _os.environ.get("DISTILLERY_TELEGRAM_CHAT", "")
+TELEGRAM_TARGET = _os.environ.get("DISTILLERY_TELEGRAM_CHAT") or "8040682185"
 
 GRADE_EMOJI = {
     "skim": "⚡",
@@ -36,6 +36,8 @@ def run_deliver(limit: Optional[int] = None, source_type: Optional[str] = None) 
         item_id = item["id"]
         try:
             msg_id = _deliver_item(item)
+            if item.get("source_type") == "newsletter":
+                _mark_newsletter_read(item["source_id"])
             now = datetime.now(timezone.utc).isoformat()
             with db() as conn:
                 update_item(
@@ -138,3 +140,10 @@ def _send_telegram_voice(audio_path: str):
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise RuntimeError(f"Telegram voice send failed: {result.stderr.strip()[:300]}")
+
+
+def _mark_newsletter_read(thread_id: str):
+    cmd = ["gog", "gmail", "thread", "modify", thread_id, "--remove", "UNREAD"]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    if result.returncode != 0:
+        print(f"  ⚠ failed to mark thread {thread_id} read: {result.stderr.strip()[:200]}")
