@@ -10,12 +10,11 @@ from typing import Optional
 
 from ..db import db, make_id, upsert_item
 
-# Gmail query to find newsletters
-NEWSLETTER_QUERY = "label:newsletters is:unread"
+NEWSLETTER_LABEL_PREFIX = "Newsletters"
 
 
 def ingest_newsletter(
-    query: str = NEWSLETTER_QUERY,
+    query: str = "",
     account: Optional[str] = None,
     limit: int = 20,
     dry_run: bool = False,
@@ -24,7 +23,7 @@ def ingest_newsletter(
     Pull unread newsletters from Gmail and insert into DB as 'ingested'.
     Returns counts: {added, skipped, total}.
     """
-    threads = _fetch_threads(query, account=account, limit=limit)
+    threads = _fetch_newsletter_threads(account=account, limit=limit)
     added = 0
     skipped = 0
     now = datetime.now(timezone.utc).isoformat()
@@ -61,7 +60,38 @@ def ingest_newsletter(
     return {"added": added, "skipped": skipped, "total": added + skipped}
 
 
-def _fetch_threads(query: str, account: Optional[str] = None, limit: int = 20) -> list:
+def _fetch_newsletter_threads(account: Optional[str] = None, limit: int = 20) -> list:
+    """Enumerate all Newsletters/* sub-labels and collect unread threads from each."""
+    sub_labels = _get_newsletter_sub_labels(account)
+    seen: set = set()
+    all_threads: list = []
+    for label_name in sub_labels:
+        # Gmail search needs spaces replaced with hyphens: "Newsletters/The Diff" → "label:Newsletters/The-Diff"
+        label_slug = label_name.replace(" ", "-")
+        query = f"label:{label_slug} is:unread"
+        threads = _run_search(query, account=account, limit=limit)
+        for t in threads:
+            tid = t.get("id", "")
+            if tid and tid not in seen:
+                seen.add(tid)
+                all_threads.append(t)
+    return all_threads
+
+
+def _get_newsletter_sub_labels(account: Optional[str] = None) -> list:
+    cmd = ["gog", "gmail", "labels", "list", "--json"]
+    if account:
+        cmd.extend(["--account", account])
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        raise RuntimeError(f"gog gmail labels list failed: {result.stderr.strip()}")
+    data = json.loads(result.stdout)
+    labels = data.get("labels", []) if isinstance(data, dict) else data
+    prefix = NEWSLETTER_LABEL_PREFIX + "/"
+    return [l["name"] for l in labels if l.get("name", "").startswith(prefix)]
+
+
+def _run_search(query: str, account: Optional[str] = None, limit: int = 20) -> list:
     cmd = ["gog", "gmail", "search", query, "--json", f"--limit={limit}"]
     if account:
         cmd.extend(["--account", account])
@@ -73,7 +103,7 @@ def _fetch_threads(query: str, account: Optional[str] = None, limit: int = 20) -
         if isinstance(data, list):
             return data
         elif isinstance(data, dict) and "threads" in data:
-            return data["threads"]
+            return data["threads"] or []
         elif isinstance(data, dict) and "messages" in data:
             return data["messages"]
         return []
