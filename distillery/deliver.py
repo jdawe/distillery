@@ -90,20 +90,34 @@ def _format_text_message(item: dict) -> str:
     if summary:
         parts.append(summary)
 
+    TG_LIMIT = 3900  # Telegram max is 4096; leave headroom for URL + safety
+
+    # Build footer separately so it's always included
+    footer = []
+    if source_url and not source_url.startswith("gmail://"):
+        footer = ["", source_url]
+
     if insights:
         parts.append("")
-        for i, ins in enumerate(insights, 1):
+        included = 0
+        for ins in insights:
             insight_text = ins.get("insight", "")
             why_matters = ins.get("why_matters", "")
+            candidate = list(parts)
             if insight_text:
-                parts.append(f"• {insight_text}")
+                candidate.append(f"• {insight_text}")
             if why_matters:
-                parts.append(f"  ↳ {why_matters}")
+                candidate.append(f"  ↳ {why_matters}")
+            preview = "\n".join(candidate + footer)
+            if len(preview) > TG_LIMIT:
+                remaining = len(insights) - included
+                if remaining:
+                    parts.append(f"  … {remaining} more insight(s) not shown")
+                break
+            parts = candidate
+            included += 1
 
-    if source_url and not source_url.startswith("gmail://"):
-        parts.append("")
-        parts.append(source_url)
-
+    parts.extend(footer)
     return "\n".join(parts)
 
 
@@ -128,7 +142,7 @@ def _send_telegram_text(text: str):
     cmd = [
         "openclaw", "message", "send",
         "--channel", "telegram",
-        "--to", TELEGRAM_TARGET,
+        "--target", TELEGRAM_TARGET,
         "--message", text,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -140,9 +154,8 @@ def _send_telegram_voice(audio_path: str):
     cmd = [
         "openclaw", "message", "send",
         "--channel", "telegram",
-        "--to", TELEGRAM_TARGET,
-        "--file", audio_path,
-        "--as-voice",
+        "--target", TELEGRAM_TARGET,
+        "--media", audio_path,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
