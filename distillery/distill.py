@@ -123,15 +123,23 @@ def run_distill(limit: Optional[int] = None, source_type: Optional[str] = None) 
 
 
 def _distill(text: str, title: str = "", author: str = "") -> dict:
-    """Run distillation via Claude. Returns parsed result dict."""
+    """Run distillation via Claude CLI (Max-plan). API fallback gated behind env var."""
     prompt = _build_prompt(text, title=title, author=author)
 
-    # Try claude CLI first
-    result = _run_claude_cli(prompt)
-    if result:
-        return result
+    cli_err = None
+    try:
+        result = _run_claude_cli(prompt)
+        if result:
+            return result
+    except Exception as e:
+        cli_err = e
 
-    # Fallback: anthropic Python SDK
+    if not _os.environ.get("DISTILLERY_ALLOW_API_FALLBACK"):
+        raise RuntimeError(
+            f"claude CLI distillation failed (cli_err={cli_err}); "
+            "API fallback is disabled. Set DISTILLERY_ALLOW_API_FALLBACK=1 to enable."
+        )
+
     result = _run_anthropic_sdk(prompt)
     if result:
         return result
@@ -157,21 +165,54 @@ def _build_prompt(text: str, title: str = "", author: str = "") -> str:
     return f"{base_prompt}\n\n{OUTPUT_WRAPPER}\n\n---\n\n## Content\n\n{header}{text}"
 
 
+CLAUDE_CLI_CANDIDATES = (
+    _os.environ.get("CLAUDE_CLI"),
+    str(Path.home() / ".local" / "bin" / "claude"),
+    "/opt/homebrew/bin/claude",
+    "/usr/local/bin/claude",
+    "claude",
+)
+CLAUDE_CLI_MODEL = _os.environ.get("CLAUDE_CLI_MODEL", "claude-sonnet-4-6")
+
+
+def _resolve_claude_cli() -> Optional[str]:
+    import shutil
+    for cand in CLAUDE_CLI_CANDIDATES:
+        if not cand:
+            continue
+        if Path(cand).is_file():
+            return cand
+        resolved = shutil.which(cand)
+        if resolved:
+            return resolved
+    return None
+
+
 def _run_claude_cli(prompt: str) -> Optional[dict]:
-    """Run distillation via `claude --print --permission-mode bypassPermissions`."""
+    """Run distillation via `claude -p` (Max-plan auth, no API billing)."""
+    claude_bin = _resolve_claude_cli()
+    if not claude_bin:
+        raise RuntimeError(
+            "claude CLI not found in PATH or known locations "
+            "(set CLAUDE_CLI=/path/to/claude)"
+        )
     try:
         result = subprocess.run(
-            ["claude", "--print", "--permission-mode", "bypassPermissions"],
+            [claude_bin, "-p", "--model", CLAUDE_CLI_MODEL,
+             "--permission-mode", "bypassPermissions"],
             input=prompt,
             capture_output=True,
             text=True,
             timeout=120,
         )
         if result.returncode != 0:
-            return None
+            raise RuntimeError(
+                f"claude CLI exit {result.returncode}: "
+                f"stderr={result.stderr[:300]}"
+            )
         return _parse_json_response(result.stdout)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return None
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError(f"claude CLI timeout after 120s") from e
 
 
 def _run_anthropic_sdk(prompt: str) -> Optional[dict]:
