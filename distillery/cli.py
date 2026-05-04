@@ -24,7 +24,7 @@ import click
 from .db import init_db, db, status_counts
 
 GRADE_EMOJI = {
-    "skim": "⚡",
+    "skim": "🥱",
     "signal": "📡",
     "fire": "🔥",
     None: "  ",
@@ -225,6 +225,71 @@ def status(as_json, today):
             r = dict(row)
             emoji = GRADE_EMOJI.get(r.get("grade"), "  ")
             click.echo(f"  {emoji} {r.get('state','?'):<12} {r.get('title','?')[:50]}")
+
+
+# ──────────────────────────────────────────────
+# distill summary
+# ──────────────────────────────────────────────
+
+@cli.command("summary")
+@click.option("--since", required=True,
+              help="ISO timestamp; counts items created/distilled at or after this.")
+@click.option("--source", default=None, type=click.Choice(["youtube", "newsletter", "url"]),
+              help="Limit to this source type")
+@click.option("--json", "as_json", is_flag=True)
+def summary(since, source, as_json):
+    """Per-run summary: new items by channel + grade counts (no historical totals)."""
+    with db() as conn:
+        new_sql = "SELECT source_type, COUNT(*) as n FROM items WHERE created_at >= ?"
+        params: list = [since]
+        if source:
+            new_sql += " AND source_type = ?"
+            params.append(source)
+        new_sql += " GROUP BY source_type ORDER BY source_type"
+        new_rows = [dict(r) for r in conn.execute(new_sql, params).fetchall()]
+
+        grade_sql = ("SELECT grade, COUNT(*) as n FROM items "
+                     "WHERE distilled_at >= ? AND grade IS NOT NULL")
+        params = [since]
+        if source:
+            grade_sql += " AND source_type = ?"
+            params.append(source)
+        grade_sql += " GROUP BY grade"
+        grade_rows = {r["grade"]: r["n"] for r in conn.execute(grade_sql, params).fetchall()}
+
+        fail_sql = ("SELECT COUNT(*) as n FROM items "
+                    "WHERE error_at >= ? AND state LIKE 'failed%'")
+        params = [since]
+        if source:
+            fail_sql += " AND source_type = ?"
+            params.append(source)
+        failed_n = conn.execute(fail_sql, params).fetchone()["n"]
+
+    if as_json:
+        click.echo(json.dumps({
+            "since": since,
+            "new": new_rows,
+            "distilled_by_grade": grade_rows,
+            "failed": failed_n,
+        }, indent=2))
+        return
+
+    if not new_rows and not grade_rows and not failed_n:
+        click.echo("No activity.")
+        return
+
+    if new_rows:
+        parts = [f"+{r['n']} {r['source_type']}" for r in new_rows]
+        click.echo("New: " + "  ".join(parts))
+
+    grade_total = sum(grade_rows.values())
+    if grade_total:
+        ordered = [("fire", "🔥"), ("signal", "📡"), ("skim", "🥱")]
+        parts = [f"{emoji} {grade_rows.get(g, 0)}" for g, emoji in ordered]
+        click.echo("Distilled: " + "  ".join(parts))
+
+    if failed_n:
+        click.echo(f"Failed: ✗ {failed_n}")
 
 
 # ──────────────────────────────────────────────

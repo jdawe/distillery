@@ -24,7 +24,7 @@ import os as _os
 FFMPEG = _os.environ.get("DISTILLERY_FFMPEG", "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg")
 
 GRADE_EMOJI = {
-    "skim": "⚡",
+    "skim": "🥱",
     "signal": "📡",
     "fire": "🔥",
 }

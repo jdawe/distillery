@@ -25,7 +25,7 @@ import os as _os
 SUMMARIZE_PROMPT = Path(_os.environ.get("DISTILLERY_PROMPT", str(Path(__file__).parent.parent / "prompts" / "summarize.md")))
 
 GRADE_EMOJI = {
-    "skim": "⚡",
+    "skim": "🥱",
     "signal": "📡",
     "fire": "🔥",
 }

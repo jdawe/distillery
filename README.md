@@ -24,7 +24,7 @@ SOURCE ADAPTERS                    PIPELINE STAGES
 
 | Grade | Emoji | Meaning |
 |-------|-------|---------|
-| `skim` | ⚡ | Nothing new. Delivered but low-signal. |
+| `skim` | 🥱 | Nothing new. Delivered but low-signal. |
 | `signal` | 📡 | 1-2 non-obvious insights. Worth your time. |
 | `fire` | 🔥 | Exceptional. Local render kept indefinitely (others get GC'd). |
 

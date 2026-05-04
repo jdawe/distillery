@@ -22,7 +22,7 @@ YT_PUBLISH = _os.environ.get(
 READ_LATER_PLAYLIST = "Read Later"
 
 GRADE_EMOJI = {
-    "skim": "⚡",
+    "skim": "🥱",
     "signal": "📡",
     "fire": "🔥",
 }
