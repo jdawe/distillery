@@ -3,6 +3,7 @@ Newsletter adapter.
 Pulls unread newsletter emails from Gmail via the `gog` CLI.
 Extracts text content for distillation.
 """
+import base64
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -114,37 +115,38 @@ def _run_search(query: str, account: Optional[str] = None, limit: int = 20) -> l
 def extract_newsletter_text(thread_id: str, account: Optional[str] = None) -> str:
     """
     Extract full text from a Gmail thread for distillation.
-    Returns concatenated message bodies.
+    Uses gog gmail thread get and decodes base64 text/plain parts.
     """
-    cmd = ["gog", "gmail", "messages", "get", thread_id, "--json"]
+    cmd = ["gog", "gmail", "thread", "get", thread_id, "--json"]
     if account:
         cmd.extend(["--account", account])
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     if result.returncode != 0:
-        raise RuntimeError(f"gog gmail messages get failed: {result.stderr.strip()}")
+        raise RuntimeError(f"gog gmail thread get failed: {result.stderr.strip()}")
     data = json.loads(result.stdout)
+    messages = data.get("thread", {}).get("messages", [])
 
-    # Extract text parts
     parts = []
-    if isinstance(data, list):
-        for msg in data:
-            parts.append(_extract_body(msg))
-    elif isinstance(data, dict):
-        parts.append(_extract_body(data))
+    for msg in messages:
+        text = _extract_payload_text(msg.get("payload", {}))
+        if text:
+            parts.append(text)
 
-    return "\n\n---\n\n".join(p for p in parts if p.strip())
+    return "\n\n---\n\n".join(parts)
 
 
-def _extract_body(msg: dict) -> str:
-    """Recursively extract text body from a Gmail message object."""
-    # Direct body field
-    if "body" in msg and msg["body"]:
-        return msg["body"]
-    if "snippet" in msg and msg["snippet"]:
-        return msg["snippet"]
-    # Nested parts
-    for part in msg.get("parts", []):
-        body = _extract_body(part)
-        if body:
-            return body
+def _extract_payload_text(payload: dict) -> str:
+    """Walk a Gmail message payload tree and return decoded text/plain content."""
+    mime = payload.get("mimeType", "")
+    body = payload.get("body", {})
+
+    if mime == "text/plain" and isinstance(body, dict) and body.get("data"):
+        raw = base64.urlsafe_b64decode(body["data"] + "==").decode("utf-8", errors="replace")
+        return raw.strip()
+
+    for part in payload.get("parts", []):
+        text = _extract_payload_text(part)
+        if text:
+            return text
+
     return ""
