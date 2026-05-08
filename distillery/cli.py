@@ -102,6 +102,17 @@ def ingest_twitter_cmd(dry_run):
                f"({result['total']} total)")
 
 
+@ingest.command("youtube-channels")
+@click.option("--lookback-days", default=3, type=int, help="How many days back to check for new videos")
+@click.option("--dry-run", is_flag=True)
+def ingest_youtube_channels_cmd(lookback_days, dry_run):
+    """Monitor subscribed YouTube channels for new videos via RSS."""
+    from .adapters.youtube_channels import ingest_youtube_channels
+    result = ingest_youtube_channels(lookback_days=lookback_days, dry_run=dry_run)
+    click.echo(f"YouTube channels: +{result['added']} new, {result['skipped']} already known "
+               f"({result['total']} total)")
+
+
 # Handle: distill ingest <url> as top-level shorthand
 @cli.command("ingest")
 @click.argument("target")
@@ -120,6 +131,8 @@ def ingest_dispatch(ctx, target, dry_run):
                    account=None, limit=20, dry_run=dry_run)
     elif target == "twitter":
         ctx.invoke(ingest_twitter_cmd, dry_run=dry_run)
+    elif target == "youtube-channels":
+        ctx.invoke(ingest_youtube_channels_cmd, lookback_days=3, dry_run=dry_run)
     elif target.startswith("http://") or target.startswith("https://"):
         ctx.invoke(ingest_url_cmd, url=target, dry_run=dry_run)
     else:
