@@ -1,96 +1,93 @@
 """
 YouTube channel subscription monitor.
 
-Fetches RSS feeds for configured channels and ingests new videos as distillable
-items. Items enter at 'ingested' state — the extract stage handles transcript
-fetching via youtube-transcript-api.
+Fetches the latest videos from configured channels via yt-dlp (no API key
+required) and ingests new videos as distillable items. Items enter at
+'ingested' state — the extract stage handles transcript fetching via
+youtube-transcript-api.
+
+Why yt-dlp instead of RSS: YouTube's RSS feed endpoint started returning
+HTTP 500 for certain channels (e.g. UC0C-17n9iuUQPylguM1d-lQ as of 2026-06),
+silently breaking the pipeline. yt-dlp is community-maintained against
+YouTube's frontend changes and works for every channel.
 
 Channel config: ~/.openclaw/workspace/data/distillery/youtube-channels.json
 Format:
   [{"channel_id": "UCxxxxxxx", "name": "Channel Name"}, ...]
-
-RSS feed URL: https://www.youtube.com/feeds/videos.xml?channel_id=<id>
-No API key required.
 """
 from __future__ import annotations
 
-import urllib.request
-import xml.etree.ElementTree as ET
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
 import json
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
 
 from ..db import db, make_id, upsert_item
 
 CHANNELS_PATH = Path.home() / ".openclaw/workspace/data/distillery/youtube-channels.json"
-RSS_BASE = "https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-YT_NS = "http://www.youtube.com/xml/schemas/2015"
-MEDIA_NS = "http://search.yahoo.com/mrss/"
+CHANNEL_URL = "https://www.youtube.com/channel/{channel_id}/videos"
+# How many of the most recent videos to consider per channel each run.
+# DB dedup gates re-ingest; we only need a window large enough to cover
+# anything posted since the last run.
+DEFAULT_FETCH_LIMIT = 20
 
 
 def _yt_url(video_id: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
-def _fetch_channel_videos(channel_id: str, name: str, lookback_days: int) -> list[dict]:
-    """Fetch recent videos from a channel's RSS feed. Returns list of video dicts."""
-    url = RSS_BASE.format(channel_id=channel_id)
-    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
-
+def _fetch_channel_videos(channel_id: str, name: str, fetch_limit: int) -> list[dict]:
+    """Fetch the latest N videos from a channel via yt-dlp. Returns list of dicts."""
+    url = CHANNEL_URL.format(channel_id=channel_id)
+    cmd = [
+        "yt-dlp",
+        "--flat-playlist",
+        "--dump-json",
+        "--no-warnings",
+        "--playlist-end", str(fetch_limit),
+        url,
+    ]
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            xml_bytes = resp.read()
-    except Exception as e:
-        print(f"  ✗ channel {name} [{channel_id}]: fetch failed — {e}")
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        print(f"  ✗ channel {name} [{channel_id}]: yt-dlp timed out")
+        return []
+    except FileNotFoundError:
+        print(f"  ✗ yt-dlp not installed (brew install yt-dlp)")
         return []
 
-    try:
-        root = ET.fromstring(xml_bytes)
-    except ET.ParseError as e:
-        print(f"  ✗ channel {name} [{channel_id}]: XML parse error — {e}")
+    if proc.returncode != 0:
+        print(f"  ✗ channel {name} [{channel_id}]: yt-dlp exit {proc.returncode} — {proc.stderr.strip()[:200]}")
         return []
 
-    atom_ns = "http://www.w3.org/2005/Atom"
     videos = []
-    for entry in root.findall(f"{{{atom_ns}}}entry"):
-        video_id_el = entry.find(f"{{{YT_NS}}}videoId")
-        if video_id_el is None:
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line:
             continue
-        video_id = video_id_el.text.strip()
-
-        title_el = entry.find(f"{{{atom_ns}}}title")
-        title = title_el.text.strip() if title_el is not None and title_el.text else ""
-
-        published_el = entry.find(f"{{{atom_ns}}}published")
-        if published_el is not None and published_el.text:
-            try:
-                pub_dt = datetime.fromisoformat(published_el.text.replace("Z", "+00:00"))
-            except ValueError:
-                pub_dt = datetime.now(timezone.utc)
-        else:
-            pub_dt = datetime.now(timezone.utc)
-
-        if pub_dt < cutoff:
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
             continue
-
+        video_id = entry.get("id")
+        if not video_id:
+            continue
         videos.append({
             "video_id": video_id,
-            "title": title,
+            "title": entry.get("title") or "",
             "channel": name,
-            "published_at": pub_dt.isoformat(),
         })
-
     return videos
 
 
 def ingest_youtube_channels(
     channels: list[dict] | None = None,
-    lookback_days: int = 3,
+    lookback_days: int = 3,  # retained for CLI compatibility; ignored — DB dedup gates re-ingest
     dry_run: bool = False,
+    fetch_limit: int = DEFAULT_FETCH_LIMIT,
 ) -> dict:
     """
-    Fetch recent videos from configured YouTube channels via RSS and ingest them.
+    Fetch recent videos from configured YouTube channels and ingest unseen ones.
     Returns counts: {added, skipped, total}.
     """
     if channels is None:
@@ -113,7 +110,7 @@ def ingest_youtube_channels(
         if not channel_id:
             continue
 
-        videos = _fetch_channel_videos(channel_id, name, lookback_days)
+        videos = _fetch_channel_videos(channel_id, name, fetch_limit)
 
         for v in videos:
             video_id = v["video_id"]
