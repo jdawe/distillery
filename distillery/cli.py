@@ -34,7 +34,6 @@ STATE_ORDER = [
     "ingested",
     "extracted",
     "distilled",
-    "rendered",
     "delivered",
 ]
 
@@ -147,7 +146,7 @@ def ingest_dispatch(ctx, target, dry_run):
 # distill run
 # ──────────────────────────────────────────────
 
-STAGES = ("extract", "distill", "render", "deliver")
+STAGES = ("extract", "distill", "deliver")
 
 
 @cli.command("run")
@@ -160,12 +159,11 @@ def run_pipeline(limit, stage, source):
     """
     Process pending items through the pipeline.
 
-    By default runs all stages in order: extract → distill → render → deliver.
+    By default runs all stages in order: extract → distill → deliver.
     Use --stage to run a single stage only.
     """
     from .extract import run_extract
     from .distill import run_distill
-    from .render import run_render
     from .deliver import run_deliver
 
     stages_to_run = [stage] if stage else list(STAGES)
@@ -178,8 +176,6 @@ def run_pipeline(limit, stage, source):
             r = run_extract(limit=limit, source_type=source)
         elif s == "distill":
             r = run_distill(limit=limit, source_type=source)
-        elif s == "render":
-            r = run_render(limit=limit, source_type=source)
         elif s == "deliver":
             r = run_deliver(limit=limit, source_type=source)
         else:
