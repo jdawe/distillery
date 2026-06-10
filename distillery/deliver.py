@@ -137,7 +137,12 @@ def _send_telegram_text(text: str):
 
 
 def _mark_newsletter_read(thread_id: str):
-    cmd = ["gog", "gmail", "thread", "modify", thread_id, "--remove", "UNREAD"]
+    account = _os.environ.get("GOG_ACCOUNT") or "jonathan.dawe@gmail.com"
+    cmd = [
+        "gog", "gmail", "thread", "modify", thread_id,
+        "--account", account,
+        "--remove=UNREAD",
+    ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
     if result.returncode != 0:
         print(f"  ⚠ failed to mark thread {thread_id} read: {result.stderr.strip()[:200]}")
