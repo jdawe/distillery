@@ -91,10 +91,11 @@ def _extract_youtube(video_id: str) -> str:
         if len(text) > 100:
             return text
 
-    # Fall back to summarize CLI (extracts via yt-dlp)
+    # summarize 0.10.0's --youtube auto regressed to returning the YouTube
+    # homepage tagline instead of the transcript. Force the web extractor.
     url = f"https://www.youtube.com/watch?v={video_id}"
     result = subprocess.run(
-        ["summarize", "--extract", url],
+        ["summarize", "--extract", "--youtube", "web", url],
         capture_output=True,
         text=True,
         timeout=120,
@@ -104,6 +105,8 @@ def _extract_youtube(video_id: str) -> str:
     text = result.stdout.strip()
     if not text:
         raise RuntimeError("summarize --extract returned empty output")
+    if "Enjoy the videos and music you love" in text:
+        raise RuntimeError("summarize returned YouTube homepage tagline (transcript fetch failed)")
     return text
 
 
