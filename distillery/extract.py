@@ -112,8 +112,10 @@ def _extract_youtube(video_id: str) -> str:
 
 def _extract_newsletter(thread_id: str) -> str:
     """Extract text from Gmail thread using gog CLI."""
+    import os
     from .adapters.newsletter import extract_newsletter_text
-    return extract_newsletter_text(thread_id)
+    account = os.environ.get("GOG_ACCOUNT") or None
+    return extract_newsletter_text(thread_id, account=account)
 
 
 def _extract_url(url: str) -> str:

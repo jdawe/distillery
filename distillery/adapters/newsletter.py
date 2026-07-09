@@ -136,17 +136,67 @@ def extract_newsletter_text(thread_id: str, account: Optional[str] = None) -> st
 
 
 def _extract_payload_text(payload: dict) -> str:
-    """Walk a Gmail message payload tree and return decoded text/plain content."""
+    """Walk a Gmail message payload tree. Prefer text/plain; fall back to text/html
+    (tag-stripped) for HTML-only newsletters like The Market Ear."""
+    plain = _walk_for_mime(payload, "text/plain")
+    if plain and len(plain.strip()) >= 50:
+        return plain.strip()
+    html = _walk_for_mime(payload, "text/html")
+    if html:
+        return _html_to_text(html).strip()
+    return plain.strip() if plain else ""
+
+
+def _walk_for_mime(payload: dict, target_mime: str) -> str:
     mime = payload.get("mimeType", "")
     body = payload.get("body", {})
-
-    if mime == "text/plain" and isinstance(body, dict) and body.get("data"):
-        raw = base64.urlsafe_b64decode(body["data"] + "==").decode("utf-8", errors="replace")
-        return raw.strip()
-
+    if mime == target_mime and isinstance(body, dict) and body.get("data"):
+        return base64.urlsafe_b64decode(body["data"] + "==").decode("utf-8", errors="replace")
     for part in payload.get("parts", []):
-        text = _extract_payload_text(part)
+        text = _walk_for_mime(part, target_mime)
         if text:
             return text
-
     return ""
+
+
+def _html_to_text(html: str) -> str:
+    """Strip HTML tags and collapse whitespace. Uses stdlib html.parser to avoid
+    a BeautifulSoup dep. Preserves basic paragraph breaks."""
+    from html.parser import HTMLParser
+    import re
+
+    class _Stripper(HTMLParser):
+        BLOCK = {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6"}
+        SKIP = {"style", "script", "head", "title"}
+
+        def __init__(self):
+            super().__init__()
+            self.parts: list = []
+            self.skip_depth = 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag in self.SKIP:
+                self.skip_depth += 1
+            elif tag in self.BLOCK:
+                self.parts.append("\n")
+
+        def handle_endtag(self, tag):
+            if tag in self.SKIP:
+                self.skip_depth = max(0, self.skip_depth - 1)
+            elif tag in self.BLOCK:
+                self.parts.append("\n")
+
+        def handle_data(self, data):
+            if self.skip_depth == 0:
+                self.parts.append(data)
+
+    s = _Stripper()
+    s.feed(html)
+    text = "".join(s.parts)
+    # Decode HTML entities that HTMLParser leaves alone in some paths
+    import html as _html_mod
+    text = _html_mod.unescape(text)
+    # Collapse whitespace: preserve paragraph boundaries, drop runs
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text
