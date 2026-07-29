@@ -16,6 +16,7 @@ Your job: extract **genuinely novel insights** from the content below. Not summa
    - `insight`: The actual thing worth knowing (1-2 sentences, dense)
    - `why_new`: What makes this non-obvious or genuinely new
    - `why_matters`: Who should care and why
+   - `take`: Your own judgment on the claim — does it actually hold up, is it overstated/hedge-free-marketing, is it contrarian-but-right, or does it only apply in a narrow context? Have an opinion. If you have no real basis to judge it, say that plainly rather than padding.
 
 5. **Summary should be pithy.** One sentence that captures the essence. Think newsletter headline, not abstract.
 

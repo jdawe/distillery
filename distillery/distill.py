@@ -25,7 +25,7 @@ import os as _os
 SUMMARIZE_PROMPT = Path(_os.environ.get("DISTILLERY_PROMPT", str(Path(__file__).parent.parent / "prompts" / "summarize.md")))
 
 GRADE_EMOJI = {
-    "skim": "🥱",
+    "skim": "",
     "signal": "📡",
     "fire": "🔥",
 }
@@ -44,7 +44,8 @@ Respond with ONLY valid JSON, no markdown fences, no preamble:
     {
       "insight": "...",
       "why_new": "...",
-      "why_matters": "..."
+      "why_matters": "...",
+      "take": "..."
     }
   ]
 }
@@ -172,7 +173,7 @@ CLAUDE_CLI_CANDIDATES = (
     "/usr/local/bin/claude",
     "claude",
 )
-CLAUDE_CLI_MODEL = _os.environ.get("CLAUDE_CLI_MODEL", "claude-sonnet-4-6")
+CLAUDE_CLI_MODEL = _os.environ.get("CLAUDE_CLI_MODEL", "claude-opus-5")
 
 
 def _resolve_claude_cli() -> Optional[str]:
@@ -221,7 +222,7 @@ def _run_anthropic_sdk(prompt: str) -> Optional[dict]:
         import anthropic
         client = anthropic.Anthropic()
         message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-opus-5",
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )

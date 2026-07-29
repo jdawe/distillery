@@ -20,7 +20,7 @@ import os as _os
 TELEGRAM_TARGET = _os.environ.get("DISTILLERY_TELEGRAM_CHAT") or "8040682185"
 
 GRADE_EMOJI = {
-    "skim": "🥱",
+    "skim": "",
     "signal": "📡",
     "fire": "🔥",
 }
@@ -78,7 +78,8 @@ def _format_text_message(item: dict) -> str:
     except Exception:
         insights = []
 
-    parts = [f"{emoji} *{title}*"]
+    title_line = f"{emoji} *{title}*" if emoji else f"*{title}*"
+    parts = [title_line]
     if author:
         parts.append(f"_{author}_")
     parts.append("")
@@ -99,11 +100,14 @@ def _format_text_message(item: dict) -> str:
         for ins in insights:
             insight_text = ins.get("insight", "")
             why_matters = ins.get("why_matters", "")
+            take = ins.get("take", "")
             candidate = list(parts)
             if insight_text:
                 candidate.append(f"• {insight_text}")
             if why_matters:
                 candidate.append(f"  ↳ {why_matters}")
+            if take:
+                candidate.append(f"  ⚖ {take}")
             preview = "\n".join(candidate + footer)
             if len(preview) > TG_LIMIT:
                 remaining = len(insights) - included
