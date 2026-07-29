@@ -24,7 +24,7 @@ import click
 from .db import init_db, db, status_counts
 
 GRADE_EMOJI = {
-    "skim": "🥱",
+    "skim": "  ",
     "signal": "📡",
     "fire": "🔥",
     None: "  ",
@@ -308,7 +308,7 @@ def summary(since, source, as_json):
 
     grade_total = sum(grade_rows.values())
     if grade_total:
-        ordered = [("fire", "🔥"), ("signal", "📡"), ("skim", "🥱")]
+        ordered = [("fire", "🔥"), ("signal", "📡"), ("skim", "skim")]
         parts = [f"{emoji} {grade_rows.get(g, 0)}" for g, emoji in ordered]
         click.echo("Distilled: " + "  ".join(parts))
 
