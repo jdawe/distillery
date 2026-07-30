@@ -64,7 +64,14 @@ def run_deliver(limit: Optional[int] = None, source_type: Optional[str] = None) 
     return {"ok": ok, "failed": failed}
 
 
-def _format_text_message(item: dict) -> str:
+def _format_text_messages(item: dict) -> list:
+    """Format a distillery item into one or more Telegram messages.
+
+    Previously this built a single message and silently dropped any insights
+    that didn't fit under Telegram's 4096-char limit, appending "N more
+    insight(s) not shown" — JD asked (2026-07-30) to always see the full
+    thing instead, split across follow-up messages rather than truncated.
+    """
     grade = item.get("grade", "signal")
     emoji = GRADE_EMOJI.get(grade, "📡")
     title = item.get("title", "Untitled")
@@ -78,54 +85,56 @@ def _format_text_message(item: dict) -> str:
     except Exception:
         insights = []
 
+    TG_LIMIT = 3900  # Telegram max is 4096; leave headroom for safety
+
     title_line = f"{emoji} *{title}*" if emoji else f"*{title}*"
-    parts = [title_line]
+    header = [title_line]
     if author:
-        parts.append(f"_{author}_")
-    parts.append("")
-
+        header.append(f"_{author}_")
+    header.append("")
     if summary:
-        parts.append(summary)
+        header.append(summary)
 
-    TG_LIMIT = 3900  # Telegram max is 4096; leave headroom for URL + safety
-
-    # Build footer separately so it's always included
     footer = []
     if source_url and not source_url.startswith("gmail://"):
         footer = ["", source_url]
 
+    current = list(header)
     if insights:
-        parts.append("")
-        included = 0
-        for ins in insights:
-            insight_text = ins.get("insight", "")
-            why_matters = ins.get("why_matters", "")
-            take = ins.get("take", "")
-            candidate = list(parts)
-            if insight_text:
-                candidate.append(f"• {insight_text}")
-            if why_matters:
-                candidate.append(f"  ↳ {why_matters}")
-            if take:
-                candidate.append(f"  ⚖ {take}")
-            preview = "\n".join(candidate + footer)
-            if len(preview) > TG_LIMIT:
-                remaining = len(insights) - included
-                if remaining:
-                    parts.append(f"  … {remaining} more insight(s) not shown")
-                break
-            parts = candidate
-            included += 1
+        current.append("")
 
-    parts.extend(footer)
-    return "\n".join(parts)
+    messages = []
+    for ins in insights:
+        insight_text = ins.get("insight", "")
+        why_matters = ins.get("why_matters", "")
+        take = ins.get("take", "")
+        block = []
+        if insight_text:
+            block.append(f"• {insight_text}")
+        if why_matters:
+            block.append(f"  ↳ {why_matters}")
+        if take:
+            block.append(f"  ⚖ {take}")
+
+        candidate = current + block
+        if len("\n".join(candidate)) > TG_LIMIT and current != []:
+            # This message is full — close it out, start the next with the
+            # insight that didn't fit.
+            messages.append("\n".join(current))
+            current = [f"{title_line} (cont.)", ""] + block
+        else:
+            current = candidate
+
+    messages.append("\n".join(current + footer))
+    return messages
 
 
 def _deliver_item(item: dict) -> Optional[str]:
-    """Send text to Telegram. Returns message ID if available."""
-    text_msg = _format_text_message(item)
-    _send_telegram_text(text_msg)
-    return None  # openclaw CLI doesn't return message IDs easily
+    """Send text to Telegram, across multiple messages if needed. Returns None
+    (message IDs aren't captured — the CLI doesn't return them easily)."""
+    for msg in _format_text_messages(item):
+        _send_telegram_text(msg)
+    return None
 
 
 def _send_telegram_text(text: str):
