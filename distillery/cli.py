@@ -91,6 +91,18 @@ def ingest_url_cmd(url, dry_run):
     click.echo(f"  id: {item['id']}")
 
 
+@ingest.command("youtube-url")
+@click.argument("url")
+@click.option("--dry-run", is_flag=True)
+def ingest_youtube_url_cmd(url, dry_run):
+    """Ingest a single ad-hoc YouTube video URL."""
+    from .adapters.youtube import ingest_youtube_url
+    item = ingest_youtube_url(url, dry_run=dry_run)
+    status = "new" if item.get("inserted") else "already known"
+    click.echo(f"YouTube [{status}]: {item.get('title', url)}")
+    click.echo(f"  id: {item['id']}")
+
+
 @ingest.command("twitter")
 @click.option("--dry-run", is_flag=True)
 def ingest_twitter_cmd(dry_run):
@@ -133,7 +145,11 @@ def ingest_dispatch(ctx, target, dry_run):
     elif target == "youtube-channels":
         ctx.invoke(ingest_youtube_channels_cmd, lookback_days=3, dry_run=dry_run)
     elif target.startswith("http://") or target.startswith("https://"):
-        ctx.invoke(ingest_url_cmd, url=target, dry_run=dry_run)
+        from .adapters.youtube import parse_video_id
+        if parse_video_id(target):
+            ctx.invoke(ingest_youtube_url_cmd, url=target, dry_run=dry_run)
+        else:
+            ctx.invoke(ingest_url_cmd, url=target, dry_run=dry_run)
     else:
         click.echo(
             f"Unknown target: {target}. Use 'youtube', 'newsletter', 'twitter', or a URL.",

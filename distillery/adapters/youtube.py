@@ -4,18 +4,89 @@ Ingests from a watchlater-export JSON file produced by watchlater-scrape.sh.
 Supports the ~/.config/watchlater/manifest.json format used by the old pipeline.
 """
 import json
+import re
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse, parse_qs
 
 from ..db import db, make_id, upsert_item
 
 DEFAULT_EXPORT = Path.home() / ".config/watchlater/watchlater-export.json"
 LEGACY_MANIFEST = Path.home() / ".config/watchlater/manifest.json"
 
+_VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
 
 def _yt_url(video_id: str) -> str:
     return f"https://www.youtube.com/watch?v={video_id}"
+
+
+def parse_video_id(url: str) -> Optional[str]:
+    """
+    Extract an 11-char YouTube video ID from a watch/youtu.be/shorts/embed URL.
+    Returns None if the URL isn't a recognizable YouTube video link.
+    """
+    parsed = urlparse(url)
+    host = parsed.netloc.lower().removeprefix("www.").removeprefix("m.")
+    if host not in ("youtube.com", "youtu.be", "music.youtube.com"):
+        return None
+
+    if host == "youtu.be":
+        video_id = parsed.path.lstrip("/").split("/")[0]
+    elif parsed.path.startswith("/shorts/") or parsed.path.startswith("/embed/"):
+        video_id = parsed.path.split("/")[2] if len(parsed.path.split("/")) > 2 else ""
+    else:
+        video_id = parse_qs(parsed.query).get("v", [""])[0]
+
+    return video_id if _VIDEO_ID_RE.match(video_id) else None
+
+
+def ingest_youtube_url(url: str, dry_run: bool = False) -> dict:
+    """
+    Ingest a single ad-hoc YouTube video URL (not a Watch Later export).
+    Fetches title/uploader via yt-dlp. Raises ValueError if the URL isn't
+    a recognizable YouTube video link, RuntimeError if yt-dlp lookup fails.
+    """
+    video_id = parse_video_id(url)
+    if not video_id:
+        raise ValueError(f"Not a recognizable YouTube video URL: {url}")
+
+    canonical_url = _yt_url(video_id)
+    result = subprocess.run(
+        ["yt-dlp", "--print", "%(title)s|||%(uploader)s", "--skip-download", canonical_url],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"yt-dlp metadata lookup failed: {result.stderr.strip()[:300]}")
+
+    line = next((l for l in result.stdout.strip().splitlines() if "|||" in l), "")
+    title, _, author = line.partition("|||")
+    title = title.strip() or video_id
+    author = author.strip()
+
+    now = datetime.now(timezone.utc).isoformat()
+    item = {
+        "id": make_id("youtube", video_id),
+        "source_type": "youtube",
+        "source_id": video_id,
+        "source_url": canonical_url,
+        "title": title,
+        "author": author,
+        "state": "ingested",
+        "created_at": now,
+    }
+
+    inserted = False
+    if not dry_run:
+        with db() as conn:
+            inserted = upsert_item(conn, item)
+
+    item["inserted"] = inserted
+    return item
 
 
 def ingest_youtube(
