@@ -103,16 +103,6 @@ def ingest_youtube_url_cmd(url, dry_run):
     click.echo(f"  id: {item['id']}")
 
 
-@ingest.command("twitter")
-@click.option("--dry-run", is_flag=True)
-def ingest_twitter_cmd(dry_run):
-    """Run X/Twitter Grok searches and ingest results."""
-    from .adapters.twitter import ingest_twitter
-    result = ingest_twitter(dry_run=dry_run)
-    click.echo(f"Twitter: +{result['added']} new, {result['skipped']} already known "
-               f"({result['total']} total)")
-
-
 @ingest.command("youtube-channels")
 @click.option("--lookback-days", default=3, type=int, help="How many days back to check for new videos")
 @click.option("--dry-run", is_flag=True)
@@ -133,15 +123,13 @@ def ingest_dispatch(ctx, target, dry_run):
     """
     Ingest from any source.
 
-    TARGET can be 'youtube', 'newsletter', 'twitter', or a URL.
+    TARGET can be 'youtube', 'newsletter', or a URL.
     """
     if target == "youtube":
         ctx.invoke(ingest_youtube, export=None, dry_run=dry_run)
     elif target == "newsletter":
         ctx.invoke(ingest_newsletter, query="label:newsletters is:unread",
                    account=None, limit=20, dry_run=dry_run)
-    elif target == "twitter":
-        ctx.invoke(ingest_twitter_cmd, dry_run=dry_run)
     elif target == "youtube-channels":
         ctx.invoke(ingest_youtube_channels_cmd, lookback_days=3, dry_run=dry_run)
     elif target.startswith("http://") or target.startswith("https://"):
@@ -152,7 +140,7 @@ def ingest_dispatch(ctx, target, dry_run):
             ctx.invoke(ingest_url_cmd, url=target, dry_run=dry_run)
     else:
         click.echo(
-            f"Unknown target: {target}. Use 'youtube', 'newsletter', 'twitter', or a URL.",
+            f"Unknown target: {target}. Use 'youtube', 'newsletter', or a URL.",
             err=True,
         )
         sys.exit(1)
@@ -169,7 +157,7 @@ STAGES = ("extract", "distill", "deliver")
 @click.option("--limit", default=None, type=int, help="Max items to process per stage")
 @click.option("--stage", default=None, type=click.Choice(STAGES),
               help="Run only this stage")
-@click.option("--source", default=None, type=click.Choice(["youtube", "newsletter", "url", "twitter"]),
+@click.option("--source", default=None, type=click.Choice(["youtube", "newsletter", "url"]),
               help="Limit to this source type")
 def run_pipeline(limit, stage, source):
     """
@@ -274,7 +262,7 @@ def status(as_json, today):
 @cli.command("summary")
 @click.option("--since", required=True,
               help="ISO timestamp; counts items created/distilled at or after this.")
-@click.option("--source", default=None, type=click.Choice(["youtube", "newsletter", "url", "twitter"]),
+@click.option("--source", default=None, type=click.Choice(["youtube", "newsletter", "url"]),
               help="Limit to this source type")
 @click.option("--json", "as_json", is_flag=True)
 def summary(since, source, as_json):
@@ -339,7 +327,7 @@ def summary(since, source, as_json):
 @cli.command("list")
 @click.option("--grade", default=None, type=click.Choice(["fire", "signal", "skim"]))
 @click.option("--state", default=None)
-@click.option("--source", default=None, type=click.Choice(["youtube", "newsletter", "url", "twitter"]))
+@click.option("--source", default=None, type=click.Choice(["youtube", "newsletter", "url"]))
 @click.option("--limit", default=20, type=int)
 @click.option("--json", "as_json", is_flag=True)
 def list_items(grade, state, source, limit, as_json):
