@@ -24,8 +24,8 @@ Use the title/author/source to judge which lens applies. If unsure, default to g
 4. **Each insight needs:**
    - `insight`: The actual thing worth knowing (1-2 sentences, dense)
    - `why_new`: What makes this non-obvious or genuinely new
-   - `why_matters`: Who should care and why
-   - `take`: Your own judgment on the claim — does it actually hold up, is it overstated/hedge-free-marketing, is it contrarian-but-right, or does it only apply in a narrow context? Have an opinion. If you have no real basis to judge it, say that plainly rather than padding.
+   - `why_matters`: The application and gloss — why this point is important and how the reader could use it. Write it for this reader, not for "who should care" in general.
+   - `take`: OPTIONAL, empty string by default. Fill it only when the claim is clearly wrong, badly overstated, or likely to mislead the reader if taken at face value. Do not add a caveat for balance, to sound critical, or to point out that a claim has limits every claim has. Empty is the normal case; most insights should have no take. At most one short sentence.
 
 5. **Summary should be pithy.** One sentence that captures the essence. Think newsletter headline, not abstract.
 

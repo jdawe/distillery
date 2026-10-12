@@ -45,10 +45,12 @@ Respond with ONLY valid JSON, no markdown fences, no preamble:
       "insight": "...",
       "why_new": "...",
       "why_matters": "...",
-      "take": "..."
+      "take": ""
     }
   ]
 }
+
+"take" stays "" (empty string) unless the claim is clearly wrong or misleading.
 
 Grade rubric:
 - skim: No material new learnings. Primary restatement of existing ideas.
@@ -200,6 +202,7 @@ def _run_claude_cli(prompt: str) -> Optional[dict]:
     try:
         result = subprocess.run(
             [claude_bin, "-p", "--model", CLAUDE_CLI_MODEL,
+             "--effort", "high",
              "--permission-mode", "bypassPermissions"],
             input=prompt,
             capture_output=True,
