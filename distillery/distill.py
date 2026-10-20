@@ -207,7 +207,7 @@ def _run_claude_cli(prompt: str) -> Optional[dict]:
             input=prompt,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,
         )
         if result.returncode != 0:
             raise RuntimeError(
@@ -216,7 +216,7 @@ def _run_claude_cli(prompt: str) -> Optional[dict]:
             )
         return _parse_json_response(result.stdout)
     except subprocess.TimeoutExpired as e:
-        raise RuntimeError(f"claude CLI timeout after 120s") from e
+        raise RuntimeError(f"claude CLI timeout after 300s") from e
 
 
 def _run_anthropic_sdk(prompt: str) -> Optional[dict]:
