@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-DB_PATH = Path.home() / ".openclaw/workspace/data/distillery/distillery.db"
+from .config import DB_PATH
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS items (

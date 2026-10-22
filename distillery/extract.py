@@ -13,7 +13,7 @@ from typing import Optional
 
 from .db import db, get_pending, update_item, set_error
 
-BASE = Path.home() / ".openclaw/workspace/data/distillery"
+from .config import DATA_DIR as BASE
 TRANSCRIPTS = BASE / "transcripts"
 
 

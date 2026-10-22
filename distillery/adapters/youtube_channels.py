@@ -11,7 +11,7 @@ HTTP 500 for certain channels (e.g. UC0C-17n9iuUQPylguM1d-lQ as of 2026-06),
 silently breaking the pipeline. yt-dlp is community-maintained against
 YouTube's frontend changes and works for every channel.
 
-Channel config: ~/.openclaw/workspace/data/distillery/youtube-channels.json
+Channel config: $DISTILLERY_YOUTUBE_CHANNELS (default: $DISTILLERY_HOME/youtube-channels.json)
 Format:
   [{"channel_id": "UCxxxxxxx", "name": "Channel Name"}, ...]
 """
@@ -24,7 +24,7 @@ from pathlib import Path
 
 from ..db import db, make_id, upsert_item
 
-CHANNELS_PATH = Path.home() / ".openclaw/workspace/data/distillery/youtube-channels.json"
+from ..config import CHANNELS_PATH
 CHANNEL_URL = "https://www.youtube.com/channel/{channel_id}/videos"
 # How many of the most recent videos to consider per channel each run.
 # DB dedup gates re-ingest; we only need a window large enough to cover

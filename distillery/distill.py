@@ -18,7 +18,7 @@ from typing import Optional
 
 from .db import db, get_pending, update_item, set_error
 
-BASE = Path.home() / ".openclaw/workspace/data/distillery"
+from .config import DATA_DIR as BASE
 DISTILLATIONS_DIR = BASE / "distillations"
 
 import os as _os
@@ -225,7 +225,7 @@ def _run_anthropic_sdk(prompt: str) -> Optional[dict]:
         import anthropic
         client = anthropic.Anthropic()
         message = client.messages.create(
-            model="claude-opus-5",
+            model=CLAUDE_CLI_MODEL,
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )

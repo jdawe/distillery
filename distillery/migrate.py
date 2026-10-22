@@ -15,7 +15,7 @@ LEGACY_MANIFEST = Path.home() / ".config/watchlater/manifest.json"
 LEGACY_TRANSCRIPTS = Path.home() / ".config/watchlater/transcripts"
 LEGACY_SUMMARIES = Path.home() / ".config/watchlater/summaries"
 
-BASE = Path.home() / ".openclaw/workspace/data/distillery"
+from .config import DATA_DIR as BASE
 TRANSCRIPTS = BASE / "transcripts" / "youtube"
 
 

@@ -2,7 +2,7 @@
 
 > Raw content in. Concentrated signal out.
 
-A personal content distillation pipeline. Ingests YouTube Watch Later, newsletters, and ad-hoc URLs — grades them with Claude, renders audio with Aria TTS, and delivers to Telegram as text + voice notes.
+A personal content distillation pipeline. Ingests YouTube Watch Later, newsletters, and ad-hoc URLs — grades them with Claude, renders audio with Aria TTS, and delivers the result to a Discord channel as text.
 
 ---
 
@@ -28,13 +28,13 @@ SOURCE ADAPTERS                    PIPELINE STAGES
 | `signal` | 📡 | 1-2 non-obvious insights. Worth your time. |
 | `fire` | 🔥 | Exceptional. Local render kept indefinitely (others get GC'd). |
 
-All grades get: Telegram text message + Aria TTS voice note + local mp4 render.
+All grades get a text message in the configured Discord channel.
 🔥 renders are preserved by `distill cleanup`; everything else ages out after 14 days.
 
 ## Data Layout
 
 ```
-~/.openclaw/workspace/data/distillery/
+$DISTILLERY_HOME/   # default ~/.distillery
   distillery.db                   # SQLite — pipeline state index
   transcripts/
     youtube/{item_id}.txt         # Raw extracted transcript
@@ -57,7 +57,7 @@ pip install -e .
 
 # Configure your environment
 cp .env.example .env
-# Edit .env with your Telegram chat ID, YouTube playlist ID, etc.
+# Edit .env with your Discord channel ID, Gmail account, etc.
 ```
 
 Requires:
@@ -65,7 +65,7 @@ Requires:
 - `ffmpeg` with freetype support (e.g. `brew install ffmpeg-full` on macOS)
 - `summarize` CLI (for YouTube transcript extraction)
 - `gog` CLI (for Gmail newsletter extraction)
-- `openclaw` CLI (for Telegram delivery)
+- `openclaw` CLI (for Discord delivery)
 
 ---
 
@@ -133,7 +133,7 @@ distill history --days 14 --grade fire
 ### Maintenance
 
 ```bash
-# Re-deliver today's items to Telegram
+# Re-deliver today's items
 distill deliver --date 2026-03-31
 
 # Re-deliver specific item
@@ -170,7 +170,9 @@ All settings are configurable via environment variables or a `.env` file in the 
 
 | Setting | Env Variable | Default |
 |---------|-------------|---------|
-| DB path | `DISTILLERY_DB` | `~/.openclaw/workspace/data/distillery/distillery.db` |
+| Data directory | `DISTILLERY_HOME` | `~/.distillery` |
+| DB path | `DISTILLERY_DB` | `$DISTILLERY_HOME/distillery.db` |
+| YouTube channel list | `DISTILLERY_YOUTUBE_CHANNELS` | `$DISTILLERY_HOME/youtube-channels.json` |
 | TTS Voice | `DISTILLERY_TTS_VOICE` | `en-US-AriaNeural` |
 | ffmpeg path | `DISTILLERY_FFMPEG` | `ffmpeg` (or `ffmpeg-full` if installed) |
 | Distillation prompt | `DISTILLERY_PROMPT` | `./prompts/summarize.md` |
@@ -192,7 +194,7 @@ ingested
   → extracted     (text pulled from source)
   → distilled     (Claude graded + insights extracted)
   → rendered      (Aria TTS audio + title card mp4)
-  → delivered     (sent to Telegram)
+  → delivered     (sent to Discord)
 
 Any stage can → failed:{stage} with error stored in DB.
 ```

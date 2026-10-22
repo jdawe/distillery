@@ -1,13 +1,12 @@
 """
-Deliver stage: Send distillation to Telegram.
+Deliver stage: Send distillation to Discord.
 
 For each distilled item:
 1. Send text message: grade emoji + title + author + summary + key insights
 
-(Audio/video render and YouTube publish were dropped 2026-06-04 — JD reads
-distillations directly in Telegram, so the render step was producing unused
-media files and burning compute on every item. Pipeline is now
-extract → distill → deliver, text-only.)
+(Audio/video render and YouTube publish were dropped 2026-06-04: nothing
+consumed the media files. Pipeline is now extract → distill → deliver,
+text-only.)
 """
 import json
 import subprocess
@@ -64,12 +63,12 @@ def run_deliver(limit: Optional[int] = None, source_type: Optional[str] = None) 
 
 
 def _format_text_messages(item: dict) -> list:
-    """Format a distillery item into one or more Telegram messages.
+    """Format a distillery item into one or more messages.
 
     Previously this built a single message and silently dropped any insights
-    that didn't fit under Telegram's 4096-char limit, appending "N more
-    insight(s) not shown" — JD asked (2026-07-30) to always see the full
-    thing instead, split across follow-up messages rather than truncated.
+    that didn't fit under the chat message length limit, appending "N more
+    insight(s) not shown" — now the full text is always sent, split across
+    follow-up messages rather than truncated.
     """
     grade = item.get("grade", "signal")
     emoji = GRADE_EMOJI.get(grade, "📡")
