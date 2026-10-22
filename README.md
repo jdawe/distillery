@@ -174,7 +174,8 @@ All settings are configurable via environment variables or a `.env` file in the 
 | TTS Voice | `DISTILLERY_TTS_VOICE` | `en-US-AriaNeural` |
 | ffmpeg path | `DISTILLERY_FFMPEG` | `ffmpeg` (or `ffmpeg-full` if installed) |
 | Distillation prompt | `DISTILLERY_PROMPT` | `./prompts/summarize.md` |
-| Discord channel ID | `DISTILLERY_DISCORD_CHANNEL` | `1553568538604871791` (#distillery, hardcoded default) |
+| Discord channel ID | `DISTILLERY_DISCORD_CHANNEL` | none (required for delivery) |
+| Gmail account (mark newsletters read) | `GOG_ACCOUNT` | none (threads stay unread if unset) |
 
 Copy `.env.example` to `.env` and fill in your values:
 

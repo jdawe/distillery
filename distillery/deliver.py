@@ -17,7 +17,6 @@ from typing import Optional
 from .db import db, get_pending, update_item, set_error
 
 import os as _os
-DISCORD_TARGET = _os.environ.get("DISTILLERY_DISCORD_CHANNEL") or "1553568538604871791"
 
 GRADE_EMOJI = {
     "skim": "",
@@ -138,10 +137,13 @@ def _deliver_item(item: dict) -> Optional[str]:
 
 
 def _send_discord_text(text: str):
+    target = _os.environ.get("DISTILLERY_DISCORD_CHANNEL")
+    if not target:
+        raise RuntimeError("DISTILLERY_DISCORD_CHANNEL is not set")
     cmd = [
         "openclaw", "message", "send",
         "--channel", "discord",
-        "--target", DISCORD_TARGET,
+        "--target", target,
         "--message", text,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -150,7 +152,10 @@ def _send_discord_text(text: str):
 
 
 def _mark_newsletter_read(thread_id: str):
-    account = _os.environ.get("GOG_ACCOUNT") or "jonathan.dawe@gmail.com"
+    account = _os.environ.get("GOG_ACCOUNT")
+    if not account:
+        print(f"  ⚠ GOG_ACCOUNT not set; leaving thread {thread_id} unread")
+        return
     cmd = [
         "gog", "gmail", "thread", "modify", thread_id,
         "--account", account,

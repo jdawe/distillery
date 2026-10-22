@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-  { name = "Jan Solo", email = "jd@janjon.ai" }
+  { name = "Jan Solo" }
 ]
 keywords = ["distillation", "summarization", "podcast", "newsletter", "tts", "pipeline"]
 
