@@ -17,7 +17,7 @@ from typing import Optional
 from .db import db, get_pending, update_item, set_error
 
 import os as _os
-TELEGRAM_TARGET = _os.environ.get("DISTILLERY_TELEGRAM_CHAT") or "8040682185"
+DISCORD_TARGET = _os.environ.get("DISTILLERY_DISCORD_CHANNEL") or "1553568538604871791"
 
 GRADE_EMOJI = {
     "skim": "",
@@ -85,9 +85,9 @@ def _format_text_messages(item: dict) -> list:
     except Exception:
         insights = []
 
-    TG_LIMIT = 3900  # Telegram max is 4096; leave headroom for safety
+    DISCORD_LIMIT = 1900  # Discord max is 2000; leave headroom for safety
 
-    title_line = f"{emoji} *{title}*" if emoji else f"*{title}*"
+    title_line = f"{emoji} **{title}**" if emoji else f"**{title}**"
     header = [title_line]
     if author:
         header.append(f"_{author}_")
@@ -97,7 +97,7 @@ def _format_text_messages(item: dict) -> list:
 
     footer = []
     if source_url and not source_url.startswith("gmail://"):
-        footer = ["", source_url]
+        footer = ["", f"<{source_url}>"]
 
     current = list(header)
     if insights:
@@ -117,7 +117,7 @@ def _format_text_messages(item: dict) -> list:
             block.append(f"  ⚖ {take}")
 
         candidate = current + block
-        if len("\n".join(candidate)) > TG_LIMIT and current != []:
+        if len("\n".join(candidate)) > DISCORD_LIMIT and current != []:
             # This message is full — close it out, start the next with the
             # insight that didn't fit.
             messages.append("\n".join(current))
@@ -130,23 +130,23 @@ def _format_text_messages(item: dict) -> list:
 
 
 def _deliver_item(item: dict) -> Optional[str]:
-    """Send text to Telegram, across multiple messages if needed. Returns None
+    """Send text to Discord, across multiple messages if needed. Returns None
     (message IDs aren't captured — the CLI doesn't return them easily)."""
     for msg in _format_text_messages(item):
-        _send_telegram_text(msg)
+        _send_discord_text(msg)
     return None
 
 
-def _send_telegram_text(text: str):
+def _send_discord_text(text: str):
     cmd = [
         "openclaw", "message", "send",
-        "--channel", "telegram",
-        "--target", TELEGRAM_TARGET,
+        "--channel", "discord",
+        "--target", DISCORD_TARGET,
         "--message", text,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     if result.returncode != 0:
-        raise RuntimeError(f"Telegram text send failed: {result.stderr.strip()[:300]}")
+        raise RuntimeError(f"Discord text send failed: {result.stderr.strip()[:300]}")
 
 
 def _mark_newsletter_read(thread_id: str):

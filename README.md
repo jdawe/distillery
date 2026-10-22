@@ -174,7 +174,7 @@ All settings are configurable via environment variables or a `.env` file in the 
 | TTS Voice | `DISTILLERY_TTS_VOICE` | `en-US-AriaNeural` |
 | ffmpeg path | `DISTILLERY_FFMPEG` | `ffmpeg` (or `ffmpeg-full` if installed) |
 | Distillation prompt | `DISTILLERY_PROMPT` | `./prompts/summarize.md` |
-| Telegram chat ID | `DISTILLERY_TELEGRAM_CHAT` | `8040682185` (hardcoded default) |
+| Discord channel ID | `DISTILLERY_DISCORD_CHANNEL` | `1553568538604871791` (#distillery, hardcoded default) |
 
 Copy `.env.example` to `.env` and fill in your values:
 
