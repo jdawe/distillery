@@ -35,8 +35,8 @@ Build the `distill` CLI as a Python package per SPEC.md in this directory.
 - **Distillation prompt:** Read from `$DISTILLERY_PROMPT` (default: `./prompts/summarize.md`) and wrap output in JSON: `{grade, summary, insights[]}`
 - **Claude for distillation:** Use `claude --print --permission-mode bypassPermissions` with the text piped in, or the `summarize` CLI
 - **YouTube OAuth:** Reuse credentials at `$DISTILLERY_YT_TOKEN` and `$DISTILLERY_YT_CLIENT_SECRET`
-- **DB location:** `$DISTILLERY_DB` (default: `~/.openclaw/workspace/data/distillery/distillery.db`)
-- **File output:** `~/.openclaw/workspace/data/distillery/{transcripts,audio,video}/`
+- **DB location:** `$DISTILLERY_DB` (default: `$DISTILLERY_HOME/distillery.db`, `DISTILLERY_HOME` defaults to `~/.distillery`)
+- **File output:** `$DISTILLERY_HOME/{transcripts,audio,video}/`
 - **Telegram:** Use `openclaw message send --channel telegram --to $DISTILLERY_TELEGRAM_CHAT` for text, with `--file` + `--as-voice` for audio
 
 ## What NOT to build
